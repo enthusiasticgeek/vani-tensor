@@ -1,0 +1,86 @@
+// Tests for construction, indexing, reshape, and elementwise arithmetic.
+// Run with:  vanic test tests/test_construction_arithmetic.vani
+
+use "../src/lib.vani";
+
+fn close(x: f64, y: f64) -> bool {
+    return abs(x - y) < 1.0e-9;
+}
+
+fn main() -> i64 {
+    let shape: Vec<i64> = vec();
+    push(mut ref shape, 2); push(mut ref shape, 3);
+
+    let z: Vec<f64> = tensor_zeros(ref shape);
+    assert (len(ref z) as i64) == 6;
+    assert close(tensor_sum(ref z), 0.0);
+
+    let o: Vec<f64> = tensor_ones(ref shape);
+    assert close(tensor_sum(ref o), 6.0);
+
+    let full9: Vec<f64> = tensor_full(ref shape, 9.0);
+    let idx01: Vec<i64> = vec();
+    push(mut ref idx01, 0); push(mut ref idx01, 1);
+    assert close(tensor_get(ref full9, ref idx01, ref shape), 9.0);
+
+    // tensor_set writes exactly one element; everything else stays 0.
+    let t: Vec<f64> = tensor_zeros(ref shape);
+    let idx12: Vec<i64> = vec();
+    push(mut ref idx12, 1); push(mut ref idx12, 2);
+    tensor_set(mut ref t, ref idx12, ref shape, 42.0);
+    assert close(tensor_get(ref t, ref idx12, ref shape), 42.0);
+    let i: i64 = 0;
+    while i < 2 {
+        let j: i64 = 0;
+        while j < 3 {
+            if i != 1 {
+                let ij: Vec<i64> = vec();
+                push(mut ref ij, i); push(mut ref ij, j);
+                assert close(tensor_get(ref t, ref ij, ref shape), 0.0);
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    // tensor_copy is a real deep copy (same values, independent storage).
+    let cp: Vec<f64> = tensor_copy(ref full9);
+    assert close(cp[0], full9[0]);
+    assert close(cp[5], full9[5]);
+
+    // tensor_reshape preserves flat data exactly.
+    let new_shape: Vec<i64> = vec();
+    push(mut ref new_shape, 6);
+    let reshaped: Vec<f64> = tensor_reshape(ref full9, ref shape, ref new_shape);
+    let k: i64 = 0;
+    while k < 6 {
+        assert close(reshaped[k], full9[k]);
+        k = k + 1;
+    }
+
+    // Elementwise arithmetic, hand-computed.
+    let a: Vec<f64> = vec();
+    push(mut ref a, 1.0); push(mut ref a, 5.0); push(mut ref a, 2.0); push(mut ref a, 8.0);
+    let b: Vec<f64> = vec();
+    push(mut ref b, 10.0); push(mut ref b, 20.0); push(mut ref b, 30.0); push(mut ref b, 40.0);
+
+    let sum_ab: Vec<f64> = tensor_add(ref a, ref b);
+    assert close(sum_ab[0], 11.0);
+    assert close(sum_ab[3], 48.0);
+
+    let diff_ab: Vec<f64> = tensor_sub(ref a, ref b);
+    assert close(diff_ab[0], 0.0 - 9.0);
+
+    let mul_ab: Vec<f64> = tensor_mul(ref a, ref b);
+    assert close(mul_ab[1], 100.0);
+
+    let scaled: Vec<f64> = tensor_scale(ref a, 2.0);
+    assert close(scaled[3], 16.0);
+
+    assert close(tensor_sum(ref a), 16.0);
+    assert close(tensor_mean(ref a), 4.0);
+    assert close(tensor_max(ref a), 8.0);
+    assert close(tensor_min(ref a), 1.0);
+
+    return 0;
+}

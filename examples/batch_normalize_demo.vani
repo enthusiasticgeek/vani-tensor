@@ -1,0 +1,56 @@
+// A small "batch of feature rows" workflow: build a (batch=2, features=3)
+// tensor, add a per-feature bias via broadcasting, then report per-tensor
+// summary statistics -- the kind of shape-juggling that motivates having an
+// explicit N-D encoding instead of hand-rolling nested loops each time.
+//
+// Run with:  vanic run examples/batch_normalize_demo.vani
+
+use "../src/lib.vani";
+
+fn main() -> i64 {
+    let shape: Vec<i64> = vec();
+    push(mut ref shape, 2); push(mut ref shape, 3);
+
+    let batch: Vec<f64> = vec();
+    push(mut ref batch, 1.0); push(mut ref batch, 2.0); push(mut ref batch, 3.0);
+    push(mut ref batch, 4.0); push(mut ref batch, 5.0); push(mut ref batch, 6.0);
+
+    let bias: Vec<f64> = vec();
+    push(mut ref bias, 10.0); push(mut ref bias, 20.0); push(mut ref bias, 30.0);
+
+    print "batch tensor (2x3):";
+    let i: i64 = 0;
+    while i < 6 {
+        print batch[i];
+        i = i + 1;
+    }
+
+    let biased: Vec<f64> = tensor_broadcast_add_last_axis(ref batch, ref shape, ref bias);
+    print "after broadcasting the per-feature bias over every row:";
+    i = 0;
+    while i < 6 {
+        print biased[i];
+        i = i + 1;
+    }
+
+    print "sum:";
+    print tensor_sum(ref biased);
+    print "mean:";
+    print tensor_mean(ref biased);
+    print "max:";
+    print tensor_max(ref biased);
+    print "min:";
+    print tensor_min(ref biased);
+
+    print "transpose (3x2), via tensor_permute:";
+    let perm: Vec<i64> = vec();
+    push(mut ref perm, 1); push(mut ref perm, 0);
+    let transposed: Vec<f64> = tensor_permute(ref biased, ref shape, ref perm);
+    i = 0;
+    while i < 6 {
+        print transposed[i];
+        i = i + 1;
+    }
+
+    return 0;
+}

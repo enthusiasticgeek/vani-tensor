@@ -1,0 +1,120 @@
+// Tests for broadcasting, axis permutation, and contraction -- including two
+// composed cross-checks (not just isolated hand-computed examples):
+//   1. tensor_permute on a 3D tensor is checked against every one of its 24
+//      elements, not a hand-picked few.
+//   2. tensor_contract_last_first against a ones-vector must equal summing
+//      groups of the contracted axis -- a property that would catch a sign
+//      or stride bug that isolated small examples might miss.
+// Run with:  vanic test tests/test_broadcast_permute_contract.vani
+
+use "../src/lib.vani";
+
+fn main() -> i64 {
+    // ── broadcast_add_last_axis ──────────────────────────────────────────
+    let bshape: Vec<i64> = vec();
+    push(mut ref bshape, 2); push(mut ref bshape, 3);
+    let bdata: Vec<f64> = vec();
+    push(mut ref bdata, 1.0); push(mut ref bdata, 2.0); push(mut ref bdata, 3.0);
+    push(mut ref bdata, 4.0); push(mut ref bdata, 5.0); push(mut ref bdata, 6.0);
+    let bias: Vec<f64> = vec();
+    push(mut ref bias, 100.0); push(mut ref bias, 200.0); push(mut ref bias, 300.0);
+    let broadcasted: Vec<f64> = tensor_broadcast_add_last_axis(ref bdata, ref bshape, ref bias);
+    assert abs(broadcasted[0] - 101.0) < 1.0e-9;
+    assert abs(broadcasted[1] - 202.0) < 1.0e-9;
+    assert abs(broadcasted[2] - 303.0) < 1.0e-9;
+    assert abs(broadcasted[3] - 104.0) < 1.0e-9;
+    assert abs(broadcasted[4] - 205.0) < 1.0e-9;
+    assert abs(broadcasted[5] - 306.0) < 1.0e-9;
+
+    // ── permute: 2x3 transpose ────────────────────────────────────────────
+    let perm: Vec<i64> = vec();
+    push(mut ref perm, 1); push(mut ref perm, 0);
+    let transposed: Vec<f64> = tensor_permute(ref bdata, ref bshape, ref perm);
+    // [[1,2,3],[4,5,6]] transposed -> [[1,4],[2,5],[3,6]] flat = 1 4 2 5 3 6
+    assert abs(transposed[0] - 1.0) < 1.0e-9;
+    assert abs(transposed[1] - 4.0) < 1.0e-9;
+    assert abs(transposed[2] - 2.0) < 1.0e-9;
+    assert abs(transposed[3] - 5.0) < 1.0e-9;
+    assert abs(transposed[4] - 3.0) < 1.0e-9;
+    assert abs(transposed[5] - 6.0) < 1.0e-9;
+
+    // ── permute: full 3D exhaustive cross-check ──────────────────────────
+    // data[i,j,k] = i*100 + j*10 + k lets any permuted position be checked
+    // against a closed-form expected value, for all 24 elements.
+    let shape: Vec<i64> = vec();
+    push(mut ref shape, 2); push(mut ref shape, 3); push(mut ref shape, 4);
+    let strides: Vec<i64> = tensor_strides(ref shape);
+    let data: Vec<f64> = tensor_full(ref shape, 0.0);
+    let i: i64 = 0;
+    while i < 2 {
+        let j: i64 = 0;
+        while j < 3 {
+            let k: i64 = 0;
+            while k < 4 {
+                let idxv: Vec<i64> = vec();
+                push(mut ref idxv, i); push(mut ref idxv, j); push(mut ref idxv, k);
+                let flat: i64 = tensor_flat_index(ref idxv, ref strides);
+                set(mut ref data, flat, (i as f64) * 100.0 + (j as f64) * 10.0 + (k as f64));
+                k = k + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    let perm3: Vec<i64> = vec();
+    push(mut ref perm3, 1); push(mut ref perm3, 0); push(mut ref perm3, 2);
+    let permuted: Vec<f64> = tensor_permute(ref data, ref shape, ref perm3);
+    let out_shape: Vec<i64> = vec();
+    push(mut ref out_shape, 3); push(mut ref out_shape, 2); push(mut ref out_shape, 4);
+    let out_strides: Vec<i64> = tensor_strides(ref out_shape);
+    i = 0;
+    while i < 2 {
+        let j: i64 = 0;
+        while j < 3 {
+            let k: i64 = 0;
+            while k < 4 {
+                let out_idx: Vec<i64> = vec();
+                push(mut ref out_idx, j); push(mut ref out_idx, i); push(mut ref out_idx, k);
+                let out_flat: i64 = tensor_flat_index(ref out_idx, ref out_strides);
+                let expected: f64 = (i as f64) * 100.0 + (j as f64) * 10.0 + (k as f64);
+                assert abs(permuted[out_flat] - expected) < 1.0e-9;
+                k = k + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    // ── contract_last_first: 2x3 . 3x2 = ordinary matmul ─────────────────
+    let ca_shape: Vec<i64> = vec();
+    push(mut ref ca_shape, 2); push(mut ref ca_shape, 3);
+    let cb_shape: Vec<i64> = vec();
+    push(mut ref cb_shape, 3); push(mut ref cb_shape, 2);
+    let cb_data: Vec<f64> = vec();
+    push(mut ref cb_data, 1.0); push(mut ref cb_data, 0.0);
+    push(mut ref cb_data, 0.0); push(mut ref cb_data, 1.0);
+    push(mut ref cb_data, 1.0); push(mut ref cb_data, 1.0);
+    let contracted: Vec<f64> = tensor_contract_last_first(ref bdata, ref ca_shape, ref cb_data, ref cb_shape);
+    // [[1,2,3],[4,5,6]] . [[1,0],[0,1],[1,1]] = [[4,5],[10,11]]
+    assert abs(contracted[0] - 4.0) < 1.0e-9;
+    assert abs(contracted[1] - 5.0) < 1.0e-9;
+    assert abs(contracted[2] - 10.0) < 1.0e-9;
+    assert abs(contracted[3] - 11.0) < 1.0e-9;
+
+    // ── contract_last_first: 3D groupwise-sum consistency ────────────────
+    // Contracting a (2,3,4) tensor's last axis with a (4,1) ones-vector
+    // must equal summing each consecutive group of 4 elements.
+    let ones_shape: Vec<i64> = vec();
+    push(mut ref ones_shape, 4); push(mut ref ones_shape, 1);
+    let ones_vec: Vec<f64> = tensor_full(ref ones_shape, 1.0);
+    let summed: Vec<f64> = tensor_contract_last_first(ref data, ref shape, ref ones_vec, ref ones_shape);
+    let g: i64 = 0;
+    while g < 6 {
+        let manual: f64 = data[g * 4] + data[g * 4 + 1] + data[g * 4 + 2] + data[g * 4 + 3];
+        assert abs(summed[g] - manual) < 1.0e-9;
+        g = g + 1;
+    }
+
+    return 0;
+}

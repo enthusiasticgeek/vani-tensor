@@ -1,0 +1,48 @@
+// Tests for shape/stride/index utilities.
+// Run with:  vanic test tests/test_shape_index.vani
+
+use "../src/lib.vani";
+
+fn main() -> i64 {
+    let shape: Vec<i64> = vec();
+    push(mut ref shape, 2); push(mut ref shape, 3); push(mut ref shape, 4);
+
+    assert tensor_size(ref shape) == 24;
+
+    let st: Vec<i64> = tensor_strides(ref shape);
+    assert st[0] == 12;
+    assert st[1] == 4;
+    assert st[2] == 1;
+
+    let idx: Vec<i64> = vec();
+    push(mut ref idx, 1); push(mut ref idx, 2); push(mut ref idx, 3);
+    assert tensor_flat_index(ref idx, ref st) == 23;
+
+    let back: Vec<i64> = tensor_unflatten_index(23, ref shape);
+    assert back[0] == 1;
+    assert back[1] == 2;
+    assert back[2] == 3;
+
+    // tensor_unflatten_index / tensor_flat_index must round-trip for every
+    // flat offset in range -- not just the one hand-picked example above.
+    let n: i64 = tensor_size(ref shape);
+    let f: i64 = 0;
+    while f < n {
+        let mi: Vec<i64> = tensor_unflatten_index(f, ref shape);
+        assert tensor_flat_index(ref mi, ref st) == f;
+        f = f + 1;
+    }
+
+    let shape2: Vec<i64> = vec();
+    push(mut ref shape2, 2); push(mut ref shape2, 3); push(mut ref shape2, 4);
+    let shape3: Vec<i64> = vec();
+    push(mut ref shape3, 2); push(mut ref shape3, 3); push(mut ref shape3, 5);
+    let shape4: Vec<i64> = vec();
+    push(mut ref shape4, 2); push(mut ref shape4, 3);
+
+    assert tensor_shapes_equal(ref shape, ref shape2) == true;
+    assert tensor_shapes_equal(ref shape, ref shape3) == false;
+    assert tensor_shapes_equal(ref shape, ref shape4) == false;
+
+    return 0;
+}

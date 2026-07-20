@@ -1,0 +1,51 @@
+// Tensor contraction as the N-D generalization of matrix multiply: contracts
+// a (2,3,4) tensor's last axis against a (4,2) matrix's first axis, producing
+// a (2,3,2) result -- exactly like batching a matmul over the leading axes.
+//
+// Run with:  vanic run examples/contraction_demo.vani
+
+use "../src/lib.vani";
+
+fn main() -> i64 {
+    let a_shape: Vec<i64> = vec();
+    push(mut ref a_shape, 2); push(mut ref a_shape, 3); push(mut ref a_shape, 4);
+    // a[i,j,k] = i*100 + j*10 + k, so results are easy to sanity-check.
+    let strides: Vec<i64> = tensor_strides(ref a_shape);
+    let a: Vec<f64> = tensor_full(ref a_shape, 0.0);
+    let i: i64 = 0;
+    while i < 2 {
+        let j: i64 = 0;
+        while j < 3 {
+            let k: i64 = 0;
+            while k < 4 {
+                let idxv: Vec<i64> = vec();
+                push(mut ref idxv, i); push(mut ref idxv, j); push(mut ref idxv, k);
+                let flat: i64 = tensor_flat_index(ref idxv, ref strides);
+                tensor_set(mut ref a, ref idxv, ref a_shape, (i as f64) * 100.0 + (j as f64) * 10.0 + (k as f64));
+                k = k + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    let b_shape: Vec<i64> = vec();
+    push(mut ref b_shape, 4); push(mut ref b_shape, 2);
+    let b: Vec<f64> = vec();
+    push(mut ref b, 1.0); push(mut ref b, 0.0);
+    push(mut ref b, 0.0); push(mut ref b, 1.0);
+    push(mut ref b, 1.0); push(mut ref b, 0.0);
+    push(mut ref b, 0.0); push(mut ref b, 1.0);
+
+    let result: Vec<f64> = tensor_contract_last_first(ref a, ref a_shape, ref b, ref b_shape);
+    // result has shape (2,3,2), flat size 12.
+    print "contract (2,3,4) with (4,2) -> (2,3,2) result:";
+    let n: i64 = len(ref result) as i64;
+    i = 0;
+    while i < n {
+        print result[i];
+        i = i + 1;
+    }
+
+    return 0;
+}
