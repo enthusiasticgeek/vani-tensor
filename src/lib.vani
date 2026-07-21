@@ -15,10 +15,19 @@
 // sum(i_d * stride_d), where stride_{n-1} = 1 and stride_d = stride_{d+1}
 // * shape[d+1] (last axis varies fastest -- C order). No `use` statement
 // needed: vanic auto-includes every [deps] entry's source before compiling.
+//
+// WCET (MAINT-1, added 2026-07-21 -- see kosh-index/ROADMAP.md): no
+// function in this package gets a #[wcet(cycles=N)] attribute. Every one
+// of them has a `while` loop bounded by a tensor rank or element count --
+// both unbounded under `vanic check`'s WCET model, same as any
+// runtime-dependent loop elsewhere in this ecosystem. See each function's
+// own comment for its WCET formula (n = element count = tensor_size(shape)
+// unless noted otherwise; ndim = rank = len(shape)).
 
 // ── Shape and index utilities ────────────────────────────────────────────────
 
-// Total element count: product of every entry in shape.
+// Total element count: product of every entry in shape. WCET = 20 +
+// ndim * ~5 cycles.
 #[bounded_stack(bytes = 88)]
 fn tensor_size(shape: ref Vec<i64>) -> i64 {
     let ndim: i64 = len(shape) as i64;
@@ -32,7 +41,7 @@ fn tensor_size(shape: ref Vec<i64>) -> i64 {
 }
 
 // Row-major (C-order) strides for a shape: stride[last] = 1, stride[d] =
-// stride[d+1] * shape[d+1].
+// stride[d+1] * shape[d+1]. WCET = 20 + ndim * ~10 cycles (two passes).
 #[bounded_stack(bytes = 128)]
 fn tensor_strides(shape: ref Vec<i64>) -> Vec<i64> {
     let ndim: i64 = len(shape) as i64;
@@ -51,6 +60,7 @@ fn tensor_strides(shape: ref Vec<i64>) -> Vec<i64> {
 }
 
 // Multi-index -> flat offset: sum(idx[d] * strides[d]).
+// WCET = 20 + ndim * ~5 cycles.
 #[bounded_stack(bytes = 96)]
 fn tensor_flat_index(idx: ref Vec<i64>, strides: ref Vec<i64>) -> i64 {
     let ndim: i64 = len(idx) as i64;
@@ -64,7 +74,8 @@ fn tensor_flat_index(idx: ref Vec<i64>, strides: ref Vec<i64>) -> i64 {
 }
 
 // Flat offset -> multi-index, given shape. Inverse of tensor_flat_index
-// composed with tensor_strides.
+// composed with tensor_strides. WCET: call tensor_strides (O(ndim)) +
+// an O(ndim) loop -- O(ndim).
 #[bounded_stack(bytes = 296)]
 fn tensor_unflatten_index(flat: i64, shape: ref Vec<i64>) -> Vec<i64> {
     let strides: Vec<i64> = tensor_strides(shape);
@@ -82,6 +93,7 @@ fn tensor_unflatten_index(flat: i64, shape: ref Vec<i64>) -> Vec<i64> {
 }
 
 // True if two shapes have the same rank and the same extent on every axis.
+// WCET = 20 + ndim * ~5 cycles.
 #[bounded_stack(bytes = 83)]
 fn tensor_shapes_equal(a_shape: ref Vec<i64>, b_shape: ref Vec<i64>) -> bool {
     let na: i64 = len(a_shape) as i64;
@@ -101,7 +113,8 @@ fn tensor_shapes_equal(a_shape: ref Vec<i64>, b_shape: ref Vec<i64>) -> bool {
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
-// All-zero tensor of the given shape.
+// All-zero tensor of the given shape. WCET: call tensor_size (O(ndim)) +
+// an O(n) fill loop -- O(ndim + n).
 #[bounded_stack(bytes = 200)]
 fn tensor_zeros(shape: ref Vec<i64>) -> Vec<f64> {
     let n: i64 = tensor_size(shape);
@@ -114,7 +127,8 @@ fn tensor_zeros(shape: ref Vec<i64>) -> Vec<f64> {
     return out;
 }
 
-// All-ones tensor of the given shape.
+// All-ones tensor of the given shape. WCET: same shape as tensor_zeros --
+// O(ndim + n).
 #[bounded_stack(bytes = 200)]
 fn tensor_ones(shape: ref Vec<i64>) -> Vec<f64> {
     let n: i64 = tensor_size(shape);
@@ -127,7 +141,8 @@ fn tensor_ones(shape: ref Vec<i64>) -> Vec<f64> {
     return out;
 }
 
-// Tensor of the given shape filled with a constant value.
+// Tensor of the given shape filled with a constant value. WCET: same
+// shape as tensor_zeros -- O(ndim + n).
 #[bounded_stack(bytes = 208)]
 fn tensor_full(shape: ref Vec<i64>, value: f64) -> Vec<f64> {
     let n: i64 = tensor_size(shape);
@@ -140,7 +155,7 @@ fn tensor_full(shape: ref Vec<i64>, value: f64) -> Vec<f64> {
     return out;
 }
 
-// Deep copy of a tensor's flat data.
+// Deep copy of a tensor's flat data. WCET = 20 + n * ~10 cycles.
 #[bounded_stack(bytes = 112)]
 fn tensor_copy(data: ref Vec<f64>) -> Vec<f64> {
     let n: i64 = len(data) as i64;
@@ -155,7 +170,8 @@ fn tensor_copy(data: ref Vec<f64>) -> Vec<f64> {
 
 // ── Indexing ───────────────────────────────────────────────────────────────────
 
-// Read the element at multi-index idx.
+// Read the element at multi-index idx. WCET: tensor_strides (O(ndim)) +
+// tensor_flat_index (O(ndim)) -- O(ndim).
 #[bounded_stack(bytes = 224)]
 fn tensor_get(data: ref Vec<f64>, idx: ref Vec<i64>, shape: ref Vec<i64>) -> f64 {
     let strides: Vec<i64> = tensor_strides(shape);
@@ -165,7 +181,8 @@ fn tensor_get(data: ref Vec<f64>, idx: ref Vec<i64>, shape: ref Vec<i64>) -> f64
 
 // Write v to the element at multi-index idx. Returns 0 (unit substitute).
 // Note: data must be a mut ref parameter; pass it directly to set (no extra
-// mut ref), matching vani-matrix's mat_set convention.
+// mut ref), matching vani-matrix's mat_set convention. WCET: same shape
+// as tensor_get -- O(ndim).
 #[bounded_stack(bytes = 232)]
 fn tensor_set(data: mut ref Vec<f64>, idx: ref Vec<i64>, shape: ref Vec<i64>, v: f64) -> i64 {
     let strides: Vec<i64> = tensor_strides(shape);
@@ -179,7 +196,8 @@ fn tensor_set(data: mut ref Vec<f64>, idx: ref Vec<i64>, shape: ref Vec<i64>, v:
 // Copy of data under a new shape. The flat layout is unchanged (reshape
 // never moves elements) -- caller is responsible for old_shape and
 // new_shape having equal tensor_size; this is not checked at runtime, same
-// as vani-matrix trusting caller-supplied dimensions everywhere.
+// as vani-matrix trusting caller-supplied dimensions everywhere. WCET:
+// call tensor_copy -- O(n).
 #[bounded_stack(bytes = 192)]
 fn tensor_reshape(data: ref Vec<f64>, old_shape: ref Vec<i64>, new_shape: ref Vec<i64>) -> Vec<f64> {
     return tensor_copy(data);
@@ -187,7 +205,8 @@ fn tensor_reshape(data: ref Vec<f64>, old_shape: ref Vec<i64>, new_shape: ref Ve
 
 // ── Elementwise arithmetic and reductions ───────────────────────────────────────
 
-// Elementwise sum: out[i] = a[i] + b[i]. Same length assumed.
+// Elementwise sum: out[i] = a[i] + b[i]. Same length assumed. WCET =
+// 20 + n * ~10 cycles.
 #[bounded_stack(bytes = 120)]
 fn tensor_add(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
     let n: i64 = len(a) as i64;
@@ -201,6 +220,7 @@ fn tensor_add(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
 }
 
 // Elementwise difference: out[i] = a[i] - b[i]. Same length assumed.
+// WCET = 20 + n * ~10 cycles.
 #[bounded_stack(bytes = 120)]
 fn tensor_sub(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
     let n: i64 = len(a) as i64;
@@ -214,6 +234,7 @@ fn tensor_sub(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
 }
 
 // Elementwise (Hadamard) product: out[i] = a[i] * b[i]. Same length assumed.
+// WCET = 20 + n * ~10 cycles.
 #[bounded_stack(bytes = 120)]
 fn tensor_mul(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
     let n: i64 = len(a) as i64;
@@ -226,7 +247,7 @@ fn tensor_mul(a: ref Vec<f64>, b: ref Vec<f64>) -> Vec<f64> {
     return out;
 }
 
-// Scalar multiply: out[i] = a[i] * s.
+// Scalar multiply: out[i] = a[i] * s. WCET = 20 + n * ~10 cycles.
 #[bounded_stack(bytes = 120)]
 fn tensor_scale(a: ref Vec<f64>, s: f64) -> Vec<f64> {
     let n: i64 = len(a) as i64;
@@ -239,7 +260,7 @@ fn tensor_scale(a: ref Vec<f64>, s: f64) -> Vec<f64> {
     return out;
 }
 
-// Sum of every element.
+// Sum of every element. WCET = 20 + n * ~5 cycles.
 #[bounded_stack(bytes = 88)]
 fn tensor_sum(a: ref Vec<f64>) -> f64 {
     let n: i64 = len(a) as i64;
@@ -252,14 +273,15 @@ fn tensor_sum(a: ref Vec<f64>) -> f64 {
     return s;
 }
 
-// Arithmetic mean of every element.
+// Arithmetic mean of every element. WCET: call tensor_sum -- O(n).
 #[bounded_stack(bytes = 136)]
 fn tensor_mean(a: ref Vec<f64>) -> f64 {
     return tensor_sum(a) / (len(a) as f64);
 }
 
 // Largest element. Undefined (returns a[0]) on an empty tensor -- same
-// caller-trust convention as the rest of this library.
+// caller-trust convention as the rest of this library. WCET = 20 + n *
+// ~5 cycles.
 #[bounded_stack(bytes = 88)]
 fn tensor_max(a: ref Vec<f64>) -> f64 {
     let n: i64 = len(a) as i64;
@@ -274,7 +296,7 @@ fn tensor_max(a: ref Vec<f64>) -> f64 {
     return m;
 }
 
-// Smallest element.
+// Smallest element. WCET = 20 + n * ~5 cycles.
 #[bounded_stack(bytes = 88)]
 fn tensor_min(a: ref Vec<f64>) -> f64 {
     let n: i64 = len(a) as i64;
@@ -293,7 +315,8 @@ fn tensor_min(a: ref Vec<f64>) -> f64 {
 
 // Add a length-shape[last] vector b to every slice along a's last axis --
 // the common "add a bias vector to every row of a batch" pattern. a has the
-// given shape; b's length must equal shape's last entry.
+// given shape; b's length must equal shape's last entry. WCET: nested
+// outer/k loop touching every one of the n output elements once -- O(n).
 #[bounded_stack(bytes = 256)]
 fn tensor_broadcast_add_last_axis(a: ref Vec<f64>, shape: ref Vec<i64>, b: ref Vec<f64>) -> Vec<f64> {
     let ndim: i64 = len(shape) as i64;
@@ -319,7 +342,9 @@ fn tensor_broadcast_add_last_axis(a: ref Vec<f64>, shape: ref Vec<i64>, b: ref V
 // according to perm (perm[d] = which original axis becomes output axis d).
 // The output's shape is shape permuted the same way (compute it yourself:
 // out_shape[d] = shape[perm[d]] -- this function only reorders data, per
-// this library's "no hidden metadata" convention).
+// this library's "no hidden metadata" convention). WCET: the odometer
+// loop visits each of the n output elements once, with an O(ndim) inner
+// counter-increment per element -- O(n*ndim).
 #[bounded_stack(bytes = 450)]
 fn tensor_permute(data: ref Vec<f64>, shape: ref Vec<i64>, perm: ref Vec<i64>) -> Vec<f64> {
     let ndim: i64 = len(shape) as i64;
@@ -386,6 +411,8 @@ fn tensor_permute(data: ref Vec<f64>, shape: ref Vec<i64>, perm: ref Vec<i64>) -
 // already exactly a (outer_a x K) matrix and b's data is already exactly a
 // (K x inner_b) matrix, so this is literally vani-matrix's mat_mul_rect --
 // no new loop needed, and it inherits mat_mul_rect's tested correctness.
+// WCET: mat_mul_rect's standard triple-nested-loop matmul -- O(outer_a *
+// k_dim * inner_b).
 #[bounded_stack(bytes = 424)]
 fn tensor_contract_last_first(a: ref Vec<f64>, a_shape: ref Vec<i64>, b: ref Vec<f64>, b_shape: ref Vec<i64>) -> Vec<f64> {
     let ra: i64 = len(a_shape) as i64;
