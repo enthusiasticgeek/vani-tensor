@@ -13,8 +13,8 @@
 // tensor's data Vec is byte-for-byte the same layout as a vani-matrix
 // matrix. Multi-index (i0, i1, ..., i_{n-1}) maps to flat offset
 // sum(i_d * stride_d), where stride_{n-1} = 1 and stride_d = stride_{d+1}
-// * shape[d+1] (last axis varies fastest -- C order).
-use "../vendor/matrix/src/lib.vani";
+// * shape[d+1] (last axis varies fastest -- C order). No `use` statement
+// needed: vanic auto-includes every [deps] entry's source before compiling.
 
 // ── Shape and index utilities ────────────────────────────────────────────────
 
