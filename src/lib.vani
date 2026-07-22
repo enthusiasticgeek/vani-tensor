@@ -419,5 +419,5 @@ fn tensor_contract_last_first(a: ref Vec<f64>, a_shape: ref Vec<i64>, b: ref Vec
     let k_dim: i64 = a_shape[ra - 1];
     let outer_a: i64 = tensor_size(a_shape) / k_dim;
     let inner_b: i64 = tensor_size(b_shape) / k_dim;
-    return mat_mul_rect(a, b, outer_a, k_dim, inner_b);
+    return matrix::mat_mul_rect(a, b, outer_a, k_dim, inner_b);
 }
