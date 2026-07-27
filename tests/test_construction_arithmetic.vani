@@ -7,6 +7,14 @@ fn close(x: f64, y: f64) -> bool {
     return abs(x - y) < 1.0e-9;
 }
 
+fn double_it(x: f64) -> f64 {
+    return x * 2.0;
+}
+
+fn my_sqrt(x: f64) -> f64 {
+    return sqrt(x);
+}
+
 fn main() -> i64 {
     let shape: Vec<i64> = vec();
     push(mut ref shape, 2); push(mut ref shape, 3);
@@ -81,6 +89,20 @@ fn main() -> i64 {
     assert close(tensor_mean(ref a), 4.0);
     assert close(tensor_max(ref a), 8.0);
     assert close(tensor_min(ref a), 1.0);
+
+    // tensor_map applying a wrapped builtin (sqrt isn't itself addressable
+    // as a function pointer, only a user-declared top-level fn is).
+    let sqrt_a: Vec<f64> = vec();
+    push(mut ref sqrt_a, 4.0); push(mut ref sqrt_a, 9.0); push(mut ref sqrt_a, 16.0);
+    let sqrted: Vec<f64> = tensor_map(ref sqrt_a, my_sqrt);
+    assert close(sqrted[0], 2.0);
+    assert close(sqrted[1], 3.0);
+    assert close(sqrted[2], 4.0);
+
+    // tensor_map with a caller-defined fn(f64) -> f64.
+    let doubled: Vec<f64> = tensor_map(ref a, double_it);
+    assert close(doubled[0], 2.0);
+    assert close(doubled[3], 16.0);
 
     return 0;
 }

@@ -74,13 +74,27 @@
 
 ---
 
+## v0.1.4 (2026-07-27)
+
+- [x] `tensor_map(a, f)` -- elementwise apply for any caller-defined
+      top-level `fn(f64) -> f64`, same convention as vani-calculus's
+      single-variable functions. A compiler builtin like `sqrt` isn't
+      itself addressable as a function pointer -- confirmed by trying it
+      directly first and getting a real type error (`argument 2 ... got
+      i64`), so the test wraps it in a one-line named fn instead; the
+      function's own doc comment now says so explicitly rather than
+      claiming builtins work directly. `#[bounded_stack(bytes = 128)]`,
+      `vanic check`'s exact reported worst-case; no unrelated WCET drift
+      found in this package (checked, since two sibling packages had it
+      this session).
+- [x] `tests/test_construction_arithmetic.vani` extended: `tensor_map`
+      with a wrapped builtin (`sqrt`) and a caller-defined function.
+      Full suite + `vanic audit-safety` re-verified on both backends.
+
 ## Future
 
 No v0.2.0 is currently planned. Candidates if a concrete need shows up: full
 NumPy-style N-D broadcasting (rank-padding + per-axis size-1 stretching,
-not just the last-axis-vector case v0.1.0 covers), general Einstein
+not just the last-axis-vector case v0.1.0 covers), and general Einstein
 summation (`tensor_contract_last_first` only covers the single most common
-contraction pattern), and elementwise unary ops (`tensor_map`-style
-apply-a-function-to-every-element, blocked on vāṇी function-pointer-as-arg
-support being convenient enough for a `Vec<f64>` walk -- vani-calculus's
-`fn(f64) -> f64` parameters are the precedent to follow here).
+contraction pattern).

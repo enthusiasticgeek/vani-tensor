@@ -260,6 +260,23 @@ fn tensor_scale(a: ref Vec<f64>, s: f64) -> Vec<f64> {
     return out;
 }
 
+// Elementwise apply: out[i] = f(a[i]), for any caller-defined top-level
+// fn(f64) -> f64 (a builtin like sqrt isn't itself addressable as a
+// function pointer -- wrap it in a one-line named fn first), same
+// convention as vani-calculus's single-variable functions. WCET =
+// 20 + n * (indirect call + a few ops).
+#[bounded_stack(bytes = 128)]
+fn tensor_map(a: ref Vec<f64>, f: fn(f64) -> f64) -> Vec<f64> {
+    let n: i64 = len(a) as i64;
+    let out: Vec<f64> = vec();
+    let i: i64 = 0;
+    while i < n {
+        push(mut ref out, f(a[i]));
+        i = i + 1;
+    }
+    return out;
+}
+
 // Sum of every element. WCET = 20 + n * ~5 cycles.
 #[bounded_stack(bytes = 88)]
 fn tensor_sum(a: ref Vec<f64>) -> f64 {
