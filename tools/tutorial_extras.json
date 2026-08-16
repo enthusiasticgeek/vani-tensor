@@ -1,0 +1,13 @@
+{
+  "why_use_this": "Reach for this package when your data has more than 2 dimensions -- an image batch, a 3D grid of samples, a stack of matrices -- and [vani-matrix](https://github.com/enthusiasticgeek/vani-matrix)'s fixed rank-2 `(rows, cols)` shape genuinely can't represent it. A tensor here is just a flat row-major `Vec<f64>` plus an explicit `Vec<i64>` shape, with no hidden metadata and no wrapping struct, deliberately matching vani-matrix's own flat-`Vec`-plus-explicit-dims convention -- a rank-2 tensor's data is byte-for-byte a vani-matrix matrix, so you can pass one straight into the other's functions with zero conversion. If your data is genuinely 2D (or 1D), stay with vani-matrix -- it's the more specialized, more direct tool for that case, and this package's indexing/stride machinery is pure overhead you don't need."
+  ,
+  "math_notes": {
+    "tensor_size": "\\( \\text{size} = \\prod_{d} \\text{shape}[d] \\) -- total element count, the product of every axis length.",
+    "tensor_strides": "Row-major (\"C order\") strides: \\( \\text{stride}[n-1] = 1 \\), and \\( \\text{stride}[d] = \\text{stride}[d+1] \\cdot \\text{shape}[d+1] \\) for \\( d = n-2, \\ldots, 0 \\) -- the last axis varies fastest, matching NumPy's default layout.",
+    "tensor_flat_index": "\\( \\text{flat} = \\sum_{d} \\text{idx}[d] \\cdot \\text{stride}[d] \\) -- converts a multi-index \\( (i_0, i_1, \\ldots, i_{n-1}) \\) into the single flat offset into the underlying `Vec<f64>`, given the strides `tensor_strides` computes.",
+    "tensor_unflatten_index": "The inverse of `tensor_flat_index`: given a flat offset and the shape, recovers the multi-index \\( (i_0, \\ldots, i_{n-1}) \\) by successive division/modulo against each axis length, most-significant (slowest-varying) axis first.",
+    "tensor_sum": "\\( \\sum_i a_i \\) over every element, treating the tensor as a flat sequence regardless of its shape.",
+    "tensor_mean": "\\( \\dfrac{1}{n}\\sum_i a_i \\) -- `tensor_sum` divided by the element count.",
+    "tensor_contract_last_first": "Tensor contraction of \\( A \\)'s last axis against \\( B \\)'s first axis (requiring \\( A_{\\text{shape}}[\\text{last}] = B_{\\text{shape}}[0] = K \\)): \\( C_{\\mathbf{i},\\mathbf{j}} = \\sum_{k=1}^{K} A_{\\mathbf{i},k} \\, B_{k,\\mathbf{j}} \\), the N-D generalization of matrix multiplication. Because of this package's row-major layout, \\( A \\)'s data is already exactly an `(outer_A x K)` matrix and \\( B \\)'s is already exactly a `(K x inner_B)` matrix, so this function reuses [vani-matrix](https://github.com/enthusiasticgeek/vani-matrix)'s `mat_mul_rect` directly under a shape-computing wrapper rather than reimplementing the sum."
+  }
+}
