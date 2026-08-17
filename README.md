@@ -1,6 +1,6 @@
 # vani-tensor
 
-N-dimensional array library for the [vāṇी compiler](https://github.com/enthusiasticgeek/vani-compiler).
+N-dimensional array library for the [vāṇī compiler](https://github.com/enthusiasticgeek/vani-compiler).
 
 Depends on [vani-matrix](https://github.com/enthusiasticgeek/vani-matrix) for
 `mat_mul_rect`, which `tensor_contract_last_first` reuses directly.
@@ -61,7 +61,7 @@ sum) plus an exhaustive 24-element cross-check for `tensor_permute`.
 
 ## What this library does NOT provide
 
-These are already vāṇी compiler builtins — call them directly, no import needed:
+These are already vāṇī compiler builtins — call them directly, no import needed:
 
 `abs` `push` `pop` `len` `set` `vec`
 
