@@ -5,6 +5,8 @@ N-dimensional array library for the [vāṇी compiler](https://github.com/enth
 Depends on [vani-matrix](https://github.com/enthusiasticgeek/vani-matrix) for
 `mat_mul_rect`, which `tensor_contract_last_first` reuses directly.
 
+**API reference / tutorial:** <https://enthusiasticgeek.github.io/vani-tensor/>
+
 ## Add to your project
 
 ```toml
